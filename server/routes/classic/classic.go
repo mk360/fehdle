@@ -1,15 +1,12 @@
-package routes
+package classic
 
 import (
 	"encoding/json"
-	"errors"
-	"fehdle/common"
+	"fehdle/routes/common"
 	"fehdle/structs"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
-	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
@@ -43,55 +40,25 @@ var mainUnit MainUnit = MainUnit{
 	GameId:       0,
 }
 
-func ClassicRoute(writer http.ResponseWriter, request *http.Request) {
-	if request.Method != http.MethodPost {
-		writer.WriteHeader(405)
-	} else {
-		byteIntId, _ := io.ReadAll(request.Body)
-		match, e := regexp.Match("[0-9]", byteIntId)
-		if !match || e != nil {
-			writer.Write([]byte("Invalid payload format: expected a valid IntID, received " + string(byteIntId)))
-			writer.WriteHeader(400)
-		}
-
-		var intIdString = string(byteIntId)
-		guessed, e := findGuessedHero(intIdString)
-
-		if e != nil {
-			writer.WriteHeader(404)
-		} else {
-			var compared = compareWithMainUnit(guessed)
-			byteResponse, _ := json.Marshal(compared)
-			fmt.Println(string(byteResponse))
-			writer.Write(byteResponse)
-		}
+func Guess(writer http.ResponseWriter, request *http.Request) {
+	byteIntId, _ := io.ReadAll(request.Body)
+	match, e := regexp.Match("[0-9]", byteIntId)
+	if !match || e != nil {
+		writer.Write([]byte("Invalid payload format: expected a valid IntID, received " + string(byteIntId)))
+		writer.WriteHeader(400)
 	}
-}
 
-func findGuessedHero(intId string) (structs.JSONUnit, error) {
-	var query = url.Values{
-		"action": {"cargoquery"},
-		"format": {"json"},
-		"tables": {"Units"},
-		"fields": {"MoveType, WeaponType, _pageName=Page, WikiName, GameSort, IntID"},
-		"where":  {"IntID = " + intId},
-	}
-	resp, e := http.Get("https://feheroes.fandom.com/api.php?" + query.Encode())
+	var intIdString = string(byteIntId)
+	guessed, e := common.FindHero(intIdString)
+
 	if e != nil {
-		log.Fatalln(e)
+		writer.WriteHeader(404)
+	} else {
+		var compared = compareWithMainUnit(guessed)
+		byteResponse, _ := json.Marshal(compared)
+		fmt.Println(string(byteResponse))
+		writer.Write(byteResponse)
 	}
-	defer resp.Body.Close()
-	data, _ := io.ReadAll(resp.Body)
-	var foundUnit structs.UnitResponse = structs.UnitResponse{}
-	json.Unmarshal(data, &foundUnit)
-	fmt.Println(foundUnit)
-	var jsonUnit structs.JSONUnit = structs.JSONUnit{}
-	if len(foundUnit.CargoQuery) > 0 {
-		jsonUnit = foundUnit.CargoQuery[0]
-		return jsonUnit, nil
-	}
-	var notFoundError = errors.New("Could not find unit with intId " + intId)
-	return jsonUnit, notFoundError
 }
 
 func compareWithMainUnit(chosenPick structs.JSONUnit) GuessingResult {

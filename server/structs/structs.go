@@ -11,5 +11,6 @@ type JSONUnit struct {
 		Name       string `json:"Page"`
 		IntID      string `json:"IntID"`
 		GameId     string `json:"GameSort"`
+		WikiName   string `json:"WikiName"`
 	} `json:"title"`
 }
